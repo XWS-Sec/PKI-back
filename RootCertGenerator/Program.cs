@@ -12,7 +12,15 @@ namespace RootCertGenerator
     {
         static void Main(string[] args)
         {
-            var certDir = EnvResolver.ResolveCertFolder() + "apiCert.pfx";
+            var dir = EnvResolver.ResolveCertFolder();
+            var dirPath = Environment.ExpandEnvironmentVariables(dir);
+            
+            if (!Directory.Exists(dirPath))
+            {
+                Directory.CreateDirectory(dirPath);
+            }
+            
+            var certDir = dirPath + "apiCert.pfx";
             var certPath = Environment.ExpandEnvironmentVariables(certDir);
 
             if (File.Exists(certPath))

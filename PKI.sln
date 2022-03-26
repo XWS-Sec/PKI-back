@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Services", "Services\Servic
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RootCertGenerator", "RootCertGenerator\RootCertGenerator.csproj", "{B1FEDA51-4A38-4C64-B1B3-1854CA463E81}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Layers", "Layers", "{023D4A6D-937F-46B8-B126-51DAE24C91A8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{B1FEDA51-4A38-4C64-B1B3-1854CA463E81}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B1FEDA51-4A38-4C64-B1B3-1854CA463E81}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B1FEDA51-4A38-4C64-B1B3-1854CA463E81}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{2EB64E44-387C-4876-B2F5-1FCA072A1D75} = {023D4A6D-937F-46B8-B126-51DAE24C91A8}
+		{87A29A53-F898-4248-B515-DA6802FF68C5} = {023D4A6D-937F-46B8-B126-51DAE24C91A8}
 	EndGlobalSection
 EndGlobal

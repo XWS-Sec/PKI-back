@@ -18,7 +18,7 @@ After the env variables have been set, restart rider/vs!
 
 # Instructions
 
-When the repo is cloned, first run the RootCertGenerator. After that, navigate to **%USERPROFILE%\.xws-cert\\** and double click apiCert.pfx. Install it for current user. When prompted for password, provide one that is in **XWS_PKI_ADMINPASS** env variable. After that select the _Trusted Root Certificate_ and proceed.
+When the repo is cloned, first run the RootCertGenerator. After that, navigate to **%USERPROFILE%\\.xws-cert\\** and double click apiCert.pfx. Install it for current user. When prompted for password, provide one that is in **XWS_PKI_ADMINPASS** env variable. After that select the _Trusted Root Certificate_ and proceed.
 
 Now all should be done, when running the solution change from 'IIS Express' to just 'Api' and when the solution is started, the link will be https://localhost:44321/swagger
 
