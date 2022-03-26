@@ -42,7 +42,7 @@ namespace RootCertGenerator
                 critical: true));
             
             certificateRequest.CertificateExtensions.Add(new X509KeyUsageExtension(
-                keyUsages: X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment,
+                keyUsages: X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment | X509KeyUsageFlags.KeyCertSign,
                 critical: false));
 
             certificateRequest.CertificateExtensions.Add(
