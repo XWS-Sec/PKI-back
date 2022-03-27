@@ -73,9 +73,9 @@ namespace Model
 
                     context.Certificates.Add(new Certificate
                     {
-                        Issuer = certificate.Issuer,
+                        Issuer = certificate.Issuer.Substring(3),
                         Status = CertificateStatus.Active,
-                        Subject = certificate.Subject,
+                        Subject = certificate.Subject.Substring(3),
                         SerialNumber = certificate.SerialNumber,
                         SignatureAlgorithm = certificate.SignatureAlgorithm.FriendlyName,
                         UserId = admin.Id,

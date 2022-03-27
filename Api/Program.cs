@@ -28,18 +28,15 @@ namespace Api
                         pfxPath,
                         certPass);
 
+                    
+                    webBuilder.UseStartup<Startup>();
                     webBuilder.UseKestrel(options =>
                     {
                         options.Listen(IPAddress.Loopback, 44321, listenOptions =>
                         {
-                            var connectionOptions = new HttpsConnectionAdapterOptions();
-                            connectionOptions.ServerCertificate = certificate;
-
-                            listenOptions.UseHttps();
+                            listenOptions.UseHttps(certificate);
                         });
                     });
-
-                    webBuilder.UseStartup<Startup>();
                 });
         }
     }

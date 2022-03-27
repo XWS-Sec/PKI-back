@@ -7,44 +7,40 @@ using Model.EnvironmentResolvers;
 
 namespace RootCertGenerator
 {
-    internal class Program
+    public class GenerateIntermediateCA
     {
-        private static void Main(string[] args)
+        public GenerateIntermediateCA()
         {
-            var dir = EnvResolver.ResolveCertFolder();
-            var dirPath = Environment.ExpandEnvironmentVariables(dir);
+            var certPath = EnvResolver.ResolveCertFolder();
+            var pfxPath = Environment.ExpandEnvironmentVariables(certPath) + "apiCert.pfx";
+            var certPass = Environment.GetEnvironmentVariable("XWS_PKI_ADMINPASS");
 
-            if (!Directory.Exists(dirPath)) Directory.CreateDirectory(dirPath);
-
-            var certDir = dirPath + "apiCert.pfx";
-            var certPath = Environment.ExpandEnvironmentVariables(certDir);
-
-            if (File.Exists(certPath))
-            {
-                Console.WriteLine("Certificate already exists!");
-                return;
-            }
+            var newPath = Environment.ExpandEnvironmentVariables(certPath) + "intermediate.pfx";
+            
+            var certificate = new X509Certificate2(
+                pfxPath,
+                certPass);
 
             var rsaKey = RSA.Create(2048);
 
-            var subject = "CN=ApiCertificate";
+            var subject = "CN=intermediate";
 
             var certificateRequest =
                 new CertificateRequest(subject, rsaKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-
+            
             certificateRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(
                 true,
                 false,
                 0,
                 true));
-
+            
             certificateRequest.CertificateExtensions.Add(new X509KeyUsageExtension(
                 X509KeyUsageFlags.DigitalSignature |
                 X509KeyUsageFlags.KeyEncipherment |
                 X509KeyUsageFlags.KeyCertSign |
                 X509KeyUsageFlags.CrlSign,
                 false));
-
+            
             certificateRequest.CertificateExtensions.Add(
                 new X509Extension(
                     new AsnEncodedData(
@@ -54,29 +50,30 @@ namespace RootCertGenerator
                     false
                 )
             );
+            
+            var expireAt = certificate.NotAfter.AddDays(-1);
 
-            var expireAt = DateTime.Now.AddYears(10);
-
-            var certificate = certificateRequest.CreateSelfSigned(DateTime.Now, expireAt);
-
+            var interCert =
+                certificateRequest.Create(certificate, DateTime.Now, expireAt, Guid.NewGuid().ToByteArray());
+            
             var exportableCertificate = new X509Certificate2(
-                    certificate.Export(X509ContentType.Cert),
+                    interCert.Export(X509ContentType.Cert),
                     (string)null,
                     X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)
                 .CopyWithPrivateKey(rsaKey);
 
-            exportableCertificate.FriendlyName = "ApiCertificate";
+            exportableCertificate.FriendlyName = subject.Substring(3);
 
             var password = new SecureString();
             foreach (var @char in EnvResolver.ResolveAdminPass()) password.AppendChar(@char);
 
             File.WriteAllBytes(
-                certPath,
+                newPath,
                 exportableCertificate.Export(
                     X509ContentType.Pfx,
                     password));
 
-            Console.WriteLine("Certificate created successfully! Path : " + certPath);
+            Console.WriteLine("Certificate created successfully! Path : " + newPath);
         }
     }
 }
