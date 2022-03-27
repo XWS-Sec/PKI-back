@@ -1,13 +1,9 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Net;
 using System.Security.Cryptography.X509Certificates;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Model.EnvironmentResolvers;
 
 namespace Api
@@ -34,7 +30,7 @@ namespace Api
 
                     webBuilder.UseKestrel(options =>
                     {
-                        options.Listen(System.Net.IPAddress.Loopback, 44321, listenOptions =>
+                        options.Listen(IPAddress.Loopback, 44321, listenOptions =>
                         {
                             var connectionOptions = new HttpsConnectionAdapterOptions();
                             connectionOptions.ServerCertificate = certificate;
@@ -42,10 +38,9 @@ namespace Api
                             listenOptions.UseHttps();
                         });
                     });
-                    
+
                     webBuilder.UseStartup<Startup>();
                 });
         }
-            
     }
 }

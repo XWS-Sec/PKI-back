@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using Microsoft.EntityFrameworkCore;
 
 namespace Model.Shared
@@ -9,14 +8,14 @@ namespace Model.Shared
     {
         private bool _isDisposed;
 
-        protected AppDbContext Context { get; }
-        protected DbSet<TEntity> Table { get; }
-
         protected BaseRepository(AppDbContext context)
         {
             Context = context;
             Table = Context.Set<TEntity>();
         }
+
+        protected AppDbContext Context { get; }
+        protected DbSet<TEntity> Table { get; }
 
         public void Dispose()
         {
@@ -24,26 +23,6 @@ namespace Model.Shared
             GC.SuppressFinalize(true);
         }
 
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_isDisposed)
-            {
-                return;
-            }
-
-            if (disposing)
-            {
-                Context.Dispose();
-            }
-
-            _isDisposed = true;
-        }
-
-        ~BaseRepository()
-        {
-            Dispose(false);
-        }
-        
         public int Add(TEntity entity, bool persist = true)
         {
             Table.Add(entity);
@@ -98,6 +77,20 @@ namespace Model.Shared
         public int SaveChanges()
         {
             return Context.SaveChanges();
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_isDisposed) return;
+
+            if (disposing) Context.Dispose();
+
+            _isDisposed = true;
+        }
+
+        ~BaseRepository()
+        {
+            Dispose(false);
         }
     }
 }

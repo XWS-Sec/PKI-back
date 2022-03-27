@@ -1,5 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Model.Shared;
+﻿using Model.Shared;
 
 namespace Model.Certificates.Repository
 {

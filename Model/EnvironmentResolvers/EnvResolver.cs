@@ -77,7 +77,7 @@ namespace Model.EnvironmentResolvers
                 ? "admin"
                 : username;
         }
-        
+
         public static string ResolveCertFolder()
         {
             var rootFolder = Environment.GetEnvironmentVariable("XWS_PKI_ROOT_CERT_FOLDER");

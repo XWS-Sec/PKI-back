@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -18,35 +17,33 @@ namespace Model
         {
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
             optionsBuilder.UseNpgsql(EnvResolver.GetConnectionString());
-            
+
             return new AppDbContext(optionsBuilder.Options);
         }
 
         public static void ConfigureOptions(DbContextOptionsBuilder options)
         {
             options.UseNpgsql(EnvResolver.GetConnectionString());
-            using (var context = new AppDbContext((DbContextOptions<AppDbContext>) options.Options))
+            using (var context = new AppDbContext((DbContextOptions<AppDbContext>)options.Options))
             {
-                if (context.Database.GetPendingMigrations().Any())
-                {
-                    context.Database.Migrate();
-                }
+                if (context.Database.GetPendingMigrations().Any()) context.Database.Migrate();
 
                 var roleStore = new RoleStore<IdentityRole>(context);
-                var roleManager = new RoleManager<IdentityRole>(roleStore, null, null, null, null);
+                var roleManager =
+                    new RoleManager<IdentityRole>(roleStore, null, new UpperInvariantLookupNormalizer(), null, null);
 
-                var rolesToCheck = new string[] { "User", "Intermediate", "Admin" };
+                var rolesToCheck = Constants.Constants.GetRoles();
                 foreach (var role in rolesToCheck)
-                {
                     if (!context.Roles.Any(r => r.Name == role))
                     {
-                        roleManager.CreateAsync(new IdentityRole(role)).Wait();
+                        var identityRole = new IdentityRole(role);
+                        roleManager.CreateAsync(identityRole).GetAwaiter().GetResult();
                     }
-                }
 
                 var hasher = new PasswordHasher<User>();
                 var userStore = new UserStore<User>(context);
-                var userManager = new UserManager<User>(userStore, null, null, null, null, null, null, null, null);
+                var userManager = new UserManager<User>(userStore, null, null, null, null,
+                    new UpperInvariantLookupNormalizer(), null, null, null);
 
                 var adminUserToCheck = EnvResolver.ResolveAdminUser();
                 if (!context.Users.Any(u => u.UserName == adminUserToCheck))
@@ -59,7 +56,7 @@ namespace Model
                     admin.PasswordHash = hasher.HashPassword(admin, adminPass);
 
                     userStore.CreateAsync(admin).Wait();
-                    userManager.AddToRoleAsync(admin, "Admin").Wait();
+                    userManager.AddToRoleAsync(admin, Constants.Constants.Admin).Wait();
                 }
 
                 if (!context.Certificates.Any())
@@ -74,7 +71,7 @@ namespace Model
 
                     var admin = context.Users.First(x => x.UserName == adminUserToCheck);
 
-                    context.Certificates.Add(new Certificate()
+                    context.Certificates.Add(new Certificate
                     {
                         Issuer = certificate.Issuer,
                         Status = CertificateStatus.Active,

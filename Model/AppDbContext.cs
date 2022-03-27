@@ -1,6 +1,4 @@
-﻿using System;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Model.Certificates;
 using Model.Users;
@@ -19,7 +17,7 @@ namespace Model
         protected override void OnModelCreating(ModelBuilder builder)
         {
             builder.Entity<User>()
-                .HasMany<Certificate>(u => u.Certificates);
+                .HasMany(u => u.Certificates);
             base.OnModelCreating(builder);
         }
     }

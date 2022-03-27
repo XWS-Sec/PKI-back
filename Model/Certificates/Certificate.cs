@@ -1,5 +1,4 @@
 ﻿using System;
-using Model.Users;
 
 namespace Model.Certificates
 {
@@ -14,7 +13,7 @@ namespace Model.Certificates
         public string Subject { get; set; }
 
         public CertificateStatus Status { get; set; }
-        
+
         public string UserId { get; set; }
     }
 }
