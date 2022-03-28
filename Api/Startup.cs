@@ -9,6 +9,7 @@ using Model;
 using Model.Certificates.Repository;
 using Model.Users;
 using Model.Users.Repository;
+using Services.Certificates;
 
 namespace Api
 {
@@ -42,6 +43,9 @@ namespace Api
 
             services.AddAutoMapper(typeof(Startup));
 
+            services.AddScoped<GetCertificateService>();
+            services.AddScoped<CertificateIssuingService>();
+            
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<ICertificateRepository, CertificateRepository>();
         }

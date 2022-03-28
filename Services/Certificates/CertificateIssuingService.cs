@@ -1,0 +1,225 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Model.Certificates;
+using Model.Certificates.Repository;
+using Model.Constants;
+using Model.EnvironmentResolvers;
+using Model.Users;
+using Model.Users.Repository;
+
+namespace Services.Certificates
+{
+    public class CertificateIssuingService
+    {
+        private readonly IUserRepository _userRepository;
+        private readonly ICertificateRepository _certificateRepository;
+        private readonly UserManager<User> _userManager;
+
+        private bool isAuthority;
+        private RSA rsaKey;
+        private User issuer;
+        private User isuee;
+
+        public CertificateIssuingService(IUserRepository userRepository, ICertificateRepository certificateRepository, UserManager<User> userManager)
+        {
+            _userRepository = userRepository;
+            _certificateRepository = certificateRepository;
+            _userManager = userManager;
+        }
+
+        public async Task<Certificate> CreateCertificate(string issuerUserName, string userOwner, string keyUsageFlags, 
+            DateTime validFrom, DateTime validTo, string subject, string? issuerSerialNumber)
+        {
+            issuer = _userRepository.GetAll()
+                .Include(x => x.Certificates)
+                .FirstOrDefault(x => x.UserName == issuerUserName);
+
+            isuee = _userRepository.GetAll()
+                .Include(x => x.Certificates)
+                .FirstOrDefault(x => x.UserName == userOwner);
+            
+            if (issuer is null)
+            {
+                throw new Exception($"User with username {issuerUserName} not found!");
+            }
+
+            if (isuee is null)
+            {
+                throw new Exception($"User with username {userOwner} not found!");
+            }
+
+            var flags = ParseFlags(keyUsageFlags);
+
+            if (await _userManager.IsInRoleAsync(isuee, Constants.User) && isAuthority)
+            {
+                await _userManager.RemoveFromRoleAsync(isuee, Constants.User);
+                await _userManager.AddToRoleAsync(isuee, Constants.Intermediate);
+            }
+
+            X509Certificate2 issuerCert = null;
+            if (issuerSerialNumber != null)
+            {
+                var foundIssuerInDb = issuer.Certificates
+                    .FirstOrDefault(x => x.SerialNumber == issuerSerialNumber);
+                if (foundIssuerInDb == null)
+                {
+                    throw new Exception($"Certificate with serial number {issuerSerialNumber} not linked with the user {issuerUserName}");
+                }
+
+                if (foundIssuerInDb.Status == CertificateStatus.Inactive)
+                {
+                    throw new Exception(
+                        $"Certificate with serial number {issuerSerialNumber} is no longer valid and thus cannot be used for signing new certificates");
+                }
+            
+                issuerCert = FindCertificate(issuerSerialNumber);
+                if (issuerCert == null)
+                {
+                    throw new Exception($"Certificate with serial number {issuerSerialNumber} not found on file system");
+                }
+
+                if (issuerCert.NotBefore > validFrom ||
+                    issuerCert.NotAfter < validTo)
+                {
+                    throw new Exception(
+                        $"Issuer certificate validity span is {issuerCert.NotBefore} - {issuerCert.NotAfter} and your certificate is trying to set the span to {validFrom} - {validTo}");
+                }
+            }
+            else if (!await _userManager.IsInRoleAsync(issuer, Constants.Admin))
+            {
+                throw new Exception($"Intermediate users cannot issue new self signed certificates!");
+            }
+
+            subject = $"CN={subject}";
+            rsaKey = RSA.Create(2048);
+            
+            var certificateRequest = new CertificateRequest(subject, rsaKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            
+            certificateRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(
+                isAuthority,
+                false,
+                0,
+                true));
+            
+            certificateRequest.CertificateExtensions.Add(new X509KeyUsageExtension(flags, false));
+            
+            certificateRequest.CertificateExtensions.Add(
+                new X509Extension(
+                    new AsnEncodedData(
+                        "Subject Alternative Name",
+                        new byte[] { 48, 11, 130, 9, 108, 111, 99, 97, 108, 104, 111, 115, 116 }
+                    ),
+                    false
+                )
+            );
+
+            var generatedCertificate = issuerCert == null
+                ? certificateRequest.CreateSelfSigned(validFrom, validTo)
+                : certificateRequest.Create(issuerCert, validFrom, validTo,
+                    Guid.NewGuid().ToByteArray());
+
+            return ExportGeneratedCertificate(generatedCertificate);
+        }
+
+        private X509KeyUsageFlags ParseFlags(string flags)
+        {
+            var flagArray = flags.Split(",");
+            var retVal = X509KeyUsageFlags.None;
+
+            var possibleElements = Enum.GetValues<X509KeyUsageFlags>();
+            var addedFlags = new List<X509KeyUsageFlags>();
+            
+            foreach (var flag in flagArray)
+            {
+                if (int.TryParse(flag, out int order))
+                {
+                    var currFlag = possibleElements[order];
+                    if (addedFlags.Contains(currFlag))
+                    {
+                        throw new Exception($"Flag already added! [{flag}]");
+                    }
+
+                    retVal = retVal | currFlag;
+                    addedFlags.Add(currFlag);
+
+                    if (currFlag == X509KeyUsageFlags.KeyCertSign)
+                        isAuthority = true;
+                }
+                else
+                {
+                    throw new Exception($"Unknown flag : {flag}");
+                }
+            }
+            
+            return retVal;
+        }
+
+        private X509Certificate2 FindCertificate(string serialNumber)
+        {
+            var dirPath = Environment.ExpandEnvironmentVariables(EnvResolver.ResolveCertFolder());
+            var files = Directory.GetFiles(dirPath);
+
+            foreach (var cert in files)
+            {
+                X509Certificate2 certificate = null;
+                if (cert.EndsWith("apiCert.pfx"))
+                {
+                    certificate = new X509Certificate2(cert, EnvResolver.ResolveAdminPass());
+                }
+                else
+                {
+                    certificate = new X509Certificate2(X509Certificate.CreateFromCertFile(cert));   
+                }
+                if (certificate.SerialNumber == serialNumber)
+                    return certificate;
+            }
+            
+            return null;
+        }
+
+        private Certificate ExportGeneratedCertificate(X509Certificate2 generatedCertificate)
+        {
+            var certForDatabase = new Certificate()
+            {
+                Issuer = generatedCertificate.Issuer.Substring(3),
+                Status = CertificateStatus.Active,
+                Subject = generatedCertificate.Subject.Substring(3),
+                SerialNumber = generatedCertificate.SerialNumber,
+                SignatureAlgorithm = generatedCertificate.SignatureAlgorithm.FriendlyName,
+                ValidFrom = generatedCertificate.NotBefore,
+                ValidTo = generatedCertificate.NotAfter,
+                UserId = isuee.Id
+            };
+            _certificateRepository.Add(certForDatabase);
+
+            var certCount = _userRepository.GetAll()
+                .Include(x => x.Certificates)
+                .First(x => x.UserName == isuee.UserName)
+                .Certificates.Count();
+            
+            var certFile = Environment.ExpandEnvironmentVariables(EnvResolver.ResolveCertFolder()) + isuee.UserName + "-" + certCount + "-certificate.pfx";
+            
+            var exportableCertificate = new X509Certificate2(
+                    generatedCertificate.Export(X509ContentType.Cert),
+                    (string)null,
+                    X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)
+                .CopyWithPrivateKey(rsaKey);
+
+            exportableCertificate.FriendlyName = certForDatabase.Subject;
+            
+            File.WriteAllBytes(certFile,
+                exportableCertificate.Export(X509ContentType.Pfx));
+            
+            return certForDatabase;
+        }
+    }
+}

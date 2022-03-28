@@ -27,7 +27,7 @@ namespace RootCertGenerator
 
             var rsaKey = RSA.Create(2048);
 
-            var subject = "CN=ApiCertificate";
+            var subject = "CN=ApiCertificate-XWS";
 
             var certificateRequest =
                 new CertificateRequest(subject, rsaKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -55,9 +55,7 @@ namespace RootCertGenerator
                 )
             );
 
-            var expireAt = DateTime.Now.AddYears(10);
-
-            var certificate = certificateRequest.CreateSelfSigned(DateTime.Now, expireAt);
+            var certificate = certificateRequest.CreateSelfSigned(DateTime.Now.AddYears(-10), DateTime.Now.AddYears(10));
 
             var exportableCertificate = new X509Certificate2(
                     certificate.Export(X509ContentType.Cert),
@@ -65,7 +63,7 @@ namespace RootCertGenerator
                     X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)
                 .CopyWithPrivateKey(rsaKey);
 
-            exportableCertificate.FriendlyName = "ApiCertificate";
+            exportableCertificate.FriendlyName = "ApiCertificate-XWS";
 
             var password = new SecureString();
             foreach (var @char in EnvResolver.ResolveAdminPass()) password.AppendChar(@char);
