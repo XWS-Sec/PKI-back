@@ -23,15 +23,17 @@ namespace Api.Controllers
         private readonly IMapper _mapper;
         private readonly CertificateIssuingService _certificateIssuingService;
         private readonly ExportCertificateService _exportCertificateService;
+        private readonly CertificateRevocationService _certificateRevocationService;
 
         public CertificatesController(UserManager<User> userManager, GetCertificateService getCertificateService, IMapper mapper,
-            CertificateIssuingService certificateIssuingService, ExportCertificateService exportCertificateService)
+            CertificateIssuingService certificateIssuingService, ExportCertificateService exportCertificateService, CertificateRevocationService certificateRevocationService)
         {
             _userManager = userManager;
             _getCertificateService = getCertificateService;
             _mapper = mapper;
             _certificateIssuingService = certificateIssuingService;
             _exportCertificateService = exportCertificateService;
+            _certificateRevocationService = certificateRevocationService;
         }
 
         [HttpGet]
@@ -89,6 +91,24 @@ namespace Api.Controllers
             {
                 return BadRequest(e.Message);
             }
-        } 
+        }
+
+        [HttpPut("revoke/{serialNumber}")]
+        [Authorize]
+        public async Task<IActionResult> Revoke([Required] string serialNumber)
+        {
+            try
+            {
+                var username = _userManager.GetUserName(User);
+
+                await _certificateRevocationService.Revoke(username, serialNumber);
+
+                return Ok($"Certificate with serial number {serialNumber} and all linked with it are revoked.");
+            }
+            catch (Exception e)
+            {
+                return BadRequest(e.Message);
+            }
+        }
     }
 }

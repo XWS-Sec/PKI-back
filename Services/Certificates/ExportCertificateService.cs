@@ -71,6 +71,11 @@ namespace Services.Certificates
                 throw new Exception(
                     $"User with username {username} doesn't own a certificate with serial number {serialNumber}");
             }
+
+            if (certificate.Status == CertificateStatus.Inactive)
+            {
+                throw new Exception($"Certificate with serial number {serialNumber} is no longer valid and thus cannot be exported");
+            }
         }
     }
 }

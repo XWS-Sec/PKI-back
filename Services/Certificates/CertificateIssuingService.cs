@@ -42,7 +42,7 @@ namespace Services.Certificates
         public async Task<Certificate> CreateCertificate(string issuerUserName, string userOwner, string keyUsageFlags, 
             DateTime validFrom, DateTime validTo, string subject, string? issuerSerialNumber)
         {
-            ValidateAndSetUsers(issuerUserName, userOwner, subject);
+            await ValidateAndSetUsers(issuerUserName, userOwner, subject);
 
             var flags = ParseFlags(keyUsageFlags);
 
@@ -135,14 +135,16 @@ namespace Services.Certificates
             return issuerCert;
         }
 
-        private void ValidateAndSetUsers(string issuerUserName, string userOwner, string subject)
+        private async Task ValidateAndSetUsers(string issuerUserName, string userOwner, string subject)
         {
             issuer = _userRepository.GetAll()
                 .Include(x => x.Certificates)
+                .AsNoTracking()
                 .FirstOrDefault(x => x.UserName == issuerUserName);
 
             isuee = _userRepository.GetAll()
                 .Include(x => x.Certificates)
+                .AsNoTracking()
                 .FirstOrDefault(x => x.UserName == userOwner);
 
             if (issuer is null)
@@ -158,8 +160,14 @@ namespace Services.Certificates
             if (_certificateRepository.GetAll()
                     .FirstOrDefault(x => x.Subject == subject) != null)
             {
-                throw new Exception($"User with username {userOwner} already has a certificate for subject {subject}");
+                throw new Exception($"Certificate for subject {subject} already exists");
             }
+
+            if (await _userManager.IsInRoleAsync(issuer, Constants.Admin))
+            {
+                issuer.Certificates = _certificateRepository.GetAll();
+            }
+            
         }
 
         private X509KeyUsageFlags ParseFlags(string flags)
