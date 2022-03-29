@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -43,8 +44,14 @@ namespace Api
 
             services.AddAutoMapper(typeof(Startup));
 
-            services.AddScoped<GetCertificateService>();
-            services.AddScoped<CertificateIssuingService>();
+            var allServices = typeof(GetCertificateService).Assembly
+                .GetTypes()
+                .Where(x => x.Name.EndsWith("Service"));
+
+            foreach (var @service in allServices)
+            {
+                services.AddScoped(@service);
+            }
             
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<ICertificateRepository, CertificateRepository>();

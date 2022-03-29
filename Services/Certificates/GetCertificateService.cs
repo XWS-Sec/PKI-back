@@ -37,6 +37,6 @@ namespace Services.Certificates
             }
 
             return user;
-        } 
+        }
     }
 }

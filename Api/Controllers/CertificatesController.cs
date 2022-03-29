@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 using Api.DTO;
 using AutoMapper;
@@ -21,17 +22,20 @@ namespace Api.Controllers
         private readonly GetCertificateService _getCertificateService;
         private readonly IMapper _mapper;
         private readonly CertificateIssuingService _certificateIssuingService;
+        private readonly ExportCertificateService _exportCertificateService;
 
         public CertificatesController(UserManager<User> userManager, GetCertificateService getCertificateService, IMapper mapper,
-            CertificateIssuingService certificateIssuingService)
+            CertificateIssuingService certificateIssuingService, ExportCertificateService exportCertificateService)
         {
             _userManager = userManager;
             _getCertificateService = getCertificateService;
             _mapper = mapper;
             _certificateIssuingService = certificateIssuingService;
+            _exportCertificateService = exportCertificateService;
         }
 
         [HttpGet]
+        [Authorize]
         public async Task<IActionResult> Get()
         {
             var response = await _getCertificateService.GetUserCertificates(_userManager.GetUserName(User));
@@ -64,5 +68,27 @@ namespace Api.Controllers
                 return BadRequest(e.Message);
             }
         }
+
+        [HttpGet("{serialNumber}")]
+        [Authorize]
+        public async Task<IActionResult> Export([Required] string serialNumber)
+        {
+            try
+            {
+                var username = _userManager.GetUserName(User);
+
+                var cert = await _exportCertificateService.Export(username, serialNumber);
+
+                var lastSlash = cert.LastIndexOf('\\');
+                var fileName = cert.Substring(lastSlash + 1);
+
+                var bytes = System.IO.File.ReadAllBytes(cert);
+                return File(bytes, "application/octet-stream", fileName);
+            }
+            catch (Exception e)
+            {
+                return BadRequest(e.Message);
+            }
+        } 
     }
 }

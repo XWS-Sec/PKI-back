@@ -23,39 +23,26 @@ namespace Services.Certificates
         private readonly IUserRepository _userRepository;
         private readonly ICertificateRepository _certificateRepository;
         private readonly UserManager<User> _userManager;
+        private readonly CertificateFinderService _certificateFinderService;
 
         private bool isAuthority;
         private RSA rsaKey;
         private User issuer;
         private User isuee;
 
-        public CertificateIssuingService(IUserRepository userRepository, ICertificateRepository certificateRepository, UserManager<User> userManager)
+        public CertificateIssuingService(IUserRepository userRepository, ICertificateRepository certificateRepository, UserManager<User> userManager,
+            CertificateFinderService certificateFinderService)
         {
             _userRepository = userRepository;
             _certificateRepository = certificateRepository;
             _userManager = userManager;
+            _certificateFinderService = certificateFinderService;
         }
 
         public async Task<Certificate> CreateCertificate(string issuerUserName, string userOwner, string keyUsageFlags, 
             DateTime validFrom, DateTime validTo, string subject, string? issuerSerialNumber)
         {
-            issuer = _userRepository.GetAll()
-                .Include(x => x.Certificates)
-                .FirstOrDefault(x => x.UserName == issuerUserName);
-
-            isuee = _userRepository.GetAll()
-                .Include(x => x.Certificates)
-                .FirstOrDefault(x => x.UserName == userOwner);
-            
-            if (issuer is null)
-            {
-                throw new Exception($"User with username {issuerUserName} not found!");
-            }
-
-            if (isuee is null)
-            {
-                throw new Exception($"User with username {userOwner} not found!");
-            }
+            ValidateAndSetUsers(issuerUserName, userOwner, subject);
 
             var flags = ParseFlags(keyUsageFlags);
 
@@ -68,50 +55,35 @@ namespace Services.Certificates
             X509Certificate2 issuerCert = null;
             if (issuerSerialNumber != null)
             {
-                var foundIssuerInDb = issuer.Certificates
-                    .FirstOrDefault(x => x.SerialNumber == issuerSerialNumber);
-                if (foundIssuerInDb == null)
-                {
-                    throw new Exception($"Certificate with serial number {issuerSerialNumber} not linked with the user {issuerUserName}");
-                }
-
-                if (foundIssuerInDb.Status == CertificateStatus.Inactive)
-                {
-                    throw new Exception(
-                        $"Certificate with serial number {issuerSerialNumber} is no longer valid and thus cannot be used for signing new certificates");
-                }
-            
-                issuerCert = FindCertificate(issuerSerialNumber);
-                if (issuerCert == null)
-                {
-                    throw new Exception($"Certificate with serial number {issuerSerialNumber} not found on file system");
-                }
-
-                if (issuerCert.NotBefore > validFrom ||
-                    issuerCert.NotAfter < validTo)
-                {
-                    throw new Exception(
-                        $"Issuer certificate validity span is {issuerCert.NotBefore} - {issuerCert.NotAfter} and your certificate is trying to set the span to {validFrom} - {validTo}");
-                }
+                issuerCert = ValidateAndSetIssuer(issuerUserName, validFrom, validTo, issuerSerialNumber);
             }
             else if (!await _userManager.IsInRoleAsync(issuer, Constants.Admin))
             {
                 throw new Exception($"Intermediate users cannot issue new self signed certificates!");
             }
 
+            var generatedCertificate = GenerateCertificate(validFrom, validTo, subject, flags, issuerCert);
+
+            return ExportGeneratedCertificate(generatedCertificate);
+        }
+
+        private X509Certificate2 GenerateCertificate(DateTime validFrom, DateTime validTo, string subject,
+            X509KeyUsageFlags flags, X509Certificate2 issuerCert)
+        {
             subject = $"CN={subject}";
             rsaKey = RSA.Create(2048);
-            
-            var certificateRequest = new CertificateRequest(subject, rsaKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-            
+
+            var certificateRequest =
+                new CertificateRequest(subject, rsaKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+
             certificateRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(
                 isAuthority,
                 false,
                 0,
                 true));
-            
+
             certificateRequest.CertificateExtensions.Add(new X509KeyUsageExtension(flags, false));
-            
+
             certificateRequest.CertificateExtensions.Add(
                 new X509Extension(
                     new AsnEncodedData(
@@ -126,8 +98,68 @@ namespace Services.Certificates
                 ? certificateRequest.CreateSelfSigned(validFrom, validTo)
                 : certificateRequest.Create(issuerCert, validFrom, validTo,
                     Guid.NewGuid().ToByteArray());
+            return generatedCertificate;
+        }
 
-            return ExportGeneratedCertificate(generatedCertificate);
+        private X509Certificate2 ValidateAndSetIssuer(string issuerUserName, DateTime validFrom, DateTime validTo,
+            string? issuerSerialNumber)
+        {
+            X509Certificate2 issuerCert;
+            var foundIssuerInDb = issuer.Certificates
+                .FirstOrDefault(x => x.SerialNumber == issuerSerialNumber);
+            if (foundIssuerInDb == null)
+            {
+                throw new Exception(
+                    $"Certificate with serial number {issuerSerialNumber} not linked with the user {issuerUserName}");
+            }
+
+            if (foundIssuerInDb.Status == CertificateStatus.Inactive)
+            {
+                throw new Exception(
+                    $"Certificate with serial number {issuerSerialNumber} is no longer valid and thus cannot be used for signing new certificates");
+            }
+
+            issuerCert = _certificateFinderService.FindCertificate(issuerSerialNumber);
+            if (issuerCert == null)
+            {
+                throw new Exception($"Certificate with serial number {issuerSerialNumber} not found on file system");
+            }
+
+            if (issuerCert.NotBefore > validFrom ||
+                issuerCert.NotAfter < validTo)
+            {
+                throw new Exception(
+                    $"Issuer certificate validity span is {issuerCert.NotBefore} - {issuerCert.NotAfter} and your certificate is trying to set the span to {validFrom} - {validTo}");
+            }
+
+            return issuerCert;
+        }
+
+        private void ValidateAndSetUsers(string issuerUserName, string userOwner, string subject)
+        {
+            issuer = _userRepository.GetAll()
+                .Include(x => x.Certificates)
+                .FirstOrDefault(x => x.UserName == issuerUserName);
+
+            isuee = _userRepository.GetAll()
+                .Include(x => x.Certificates)
+                .FirstOrDefault(x => x.UserName == userOwner);
+
+            if (issuer is null)
+            {
+                throw new Exception($"User with username {issuerUserName} not found!");
+            }
+
+            if (isuee is null)
+            {
+                throw new Exception($"User with username {userOwner} not found!");
+            }
+
+            if (_certificateRepository.GetAll()
+                    .FirstOrDefault(x => x.Subject == subject) != null)
+            {
+                throw new Exception($"User with username {userOwner} already has a certificate for subject {subject}");
+            }
         }
 
         private X509KeyUsageFlags ParseFlags(string flags)
@@ -161,29 +193,6 @@ namespace Services.Certificates
             }
             
             return retVal;
-        }
-
-        private X509Certificate2 FindCertificate(string serialNumber)
-        {
-            var dirPath = Environment.ExpandEnvironmentVariables(EnvResolver.ResolveCertFolder());
-            var files = Directory.GetFiles(dirPath);
-
-            foreach (var cert in files)
-            {
-                X509Certificate2 certificate = null;
-                if (cert.EndsWith("apiCert.pfx"))
-                {
-                    certificate = new X509Certificate2(cert, EnvResolver.ResolveAdminPass());
-                }
-                else
-                {
-                    certificate = new X509Certificate2(X509Certificate.CreateFromCertFile(cert));   
-                }
-                if (certificate.SerialNumber == serialNumber)
-                    return certificate;
-            }
-            
-            return null;
         }
 
         private Certificate ExportGeneratedCertificate(X509Certificate2 generatedCertificate)
