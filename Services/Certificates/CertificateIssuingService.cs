@@ -144,7 +144,6 @@ namespace Services.Certificates
 
             isuee = _userRepository.GetAll()
                 .Include(x => x.Certificates)
-                .AsNoTracking()
                 .FirstOrDefault(x => x.UserName == userOwner);
 
             if (issuer is null)
