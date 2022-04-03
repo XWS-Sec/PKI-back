@@ -12,7 +12,7 @@ namespace RootCertGenerator
         private static void Main(string[] args)
         {
             var dir = EnvResolver.ResolveCertFolder();
-            var dirPath = Environment.ExpandEnvironmentVariables(dir);
+            var dirPath = Environment.ExpandEnvironmentVariables(dir); 
 
             if (!Directory.Exists(dirPath)) Directory.CreateDirectory(dirPath);
 
