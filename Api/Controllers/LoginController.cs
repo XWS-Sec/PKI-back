@@ -1,8 +1,13 @@
-﻿using System.Threading.Tasks;
+﻿using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
 using Api.DTO;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Model.Users;
+using Services.Users;
 
 namespace Api.Controllers
 {
@@ -10,16 +15,16 @@ namespace Api.Controllers
     [Route("api/[controller]")]
     public class LoginController : ControllerBase
     {
-        private readonly RoleManager<IdentityRole> _roleManager;
         private readonly SignInManager<User> _signInManager;
+        private readonly UserCookieGenerator _userCookieGenerator;
         private readonly UserManager<User> _userManager;
 
         public LoginController(UserManager<User> userManager, SignInManager<User> signInManager,
-            RoleManager<IdentityRole> roleManager)
+            UserCookieGenerator userCookieGenerator)
         {
             _userManager = userManager;
             _signInManager = signInManager;
-            _roleManager = roleManager;
+            _userCookieGenerator = userCookieGenerator;
         }
 
         [HttpPost]
@@ -41,6 +46,8 @@ namespace Api.Controllers
                 return BadRequest(ModelState);
             }
 
+            var role = await _userManager.GetRolesAsync(user);
+            _userCookieGenerator.Fill(HttpContext.Response.Cookies, user, role.First());
             return Ok("Successful login!");
         }
 
