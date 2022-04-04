@@ -13,7 +13,6 @@ using Model.Certificates.Repository;
 using Model.Users;
 using Model.Users.Repository;
 using Services.Certificates;
-using Services.Users;
 
 namespace Api
 {
@@ -47,8 +46,6 @@ namespace Api
 
             services.AddAutoMapper(typeof(Startup));
 
-            services.AddSingleton<UserCookieGenerator>();
-            
             var allServices = typeof(GetCertificateService).Assembly
                 .GetTypes()
                 .Where(x => x.Name.EndsWith("Service"));

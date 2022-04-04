@@ -2,12 +2,12 @@
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Api.DTO;
+using AutoMapper;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Model.Users;
-using Services.Users;
 
 namespace Api.Controllers
 {
@@ -16,15 +16,14 @@ namespace Api.Controllers
     public class LoginController : ControllerBase
     {
         private readonly SignInManager<User> _signInManager;
-        private readonly UserCookieGenerator _userCookieGenerator;
+        private readonly IMapper _mapper;
         private readonly UserManager<User> _userManager;
 
-        public LoginController(UserManager<User> userManager, SignInManager<User> signInManager,
-            UserCookieGenerator userCookieGenerator)
+        public LoginController(UserManager<User> userManager, SignInManager<User> signInManager, IMapper mapper)
         {
             _userManager = userManager;
             _signInManager = signInManager;
-            _userCookieGenerator = userCookieGenerator;
+            _mapper = mapper;
         }
 
         [HttpPost]
@@ -47,8 +46,9 @@ namespace Api.Controllers
             }
 
             var role = await _userManager.GetRolesAsync(user);
-            _userCookieGenerator.Fill(HttpContext.Response.Cookies, user, role.First());
-            return Ok("Successful login!");
+            var mappedUser = _mapper.Map<LoggedInUserDto>(user);
+            mappedUser.Role = role.FirstOrDefault();
+            return Ok(mappedUser);
         }
 
         [HttpPost("/api/logout")]
