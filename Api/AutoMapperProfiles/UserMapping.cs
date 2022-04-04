@@ -12,6 +12,10 @@ namespace Api.AutoMapperProfiles
                 .ForMember(o => o.PhoneNumber, opt => opt.MapFrom(src => src.Phone))
                 .ForMember(o => o.UserName, opt => opt.MapFrom(src => src.Username))
                 .ReverseMap();
+
+            CreateMap<User, LoggedInUserDto>()
+                .ForMember(o => o.Username, opt => opt.MapFrom(src => src.UserName))
+                .ReverseMap();
         }
     }
 }
