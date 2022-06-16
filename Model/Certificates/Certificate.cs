@@ -14,6 +14,8 @@ namespace Model.Certificates
 
         public CertificateStatus Status { get; set; }
 
+        public string RevocationReason { get; set; }
+
         public string UserId { get; set; }
     }
 }

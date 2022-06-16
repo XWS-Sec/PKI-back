@@ -28,24 +28,26 @@ namespace Services.Certificates
             _userRepository = userRepository;
         }
 
-        public async Task Revoke(string username, string serialNumber)
+        public async Task Revoke(string username, string serialNumber, string revocationReason)
         {
             await ValidateAndSet(username, serialNumber);
 
-            RevokeFor(_certificate);
+            RevokeFor(_certificate, revocationReason);
         }
 
-        private void RevokeFor(Certificate certificate)
+        private void RevokeFor(Certificate certificate, string revocationReason)
         {
             var childCertificates = _certificateRepository.GetAll()
                 .Where(x => x.Issuer == certificate.Subject && x.Status == CertificateStatus.Active);
 
             foreach (var cert in childCertificates.ToList())
             {
-                RevokeFor(cert);
+                if (certificate.SerialNumber == cert.SerialNumber) continue;
+                RevokeFor(cert, revocationReason);
             }
 
             certificate.Status = CertificateStatus.Inactive;
+            certificate.RevocationReason = revocationReason;
             _certificateRepository.Update(certificate);
         }
         

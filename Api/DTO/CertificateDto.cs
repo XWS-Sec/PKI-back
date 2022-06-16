@@ -11,6 +11,7 @@ namespace Api.DTO
         public DateTime ValidTo { get; set; }
         public string Subject { get; set; }
         public string Status { get; set; }
+        public string RevocationReason { get; set; }
 
         public string OwnerName { get; set; }
         public string OwnerSurname { get; set; }
