@@ -95,13 +95,13 @@ namespace Api.Controllers
 
         [HttpPut("revoke/{serialNumber}")]
         [Authorize]
-        public async Task<IActionResult> Revoke([Required] string serialNumber)
+        public async Task<IActionResult> Revoke([Required] string serialNumber, [Required] string revocationReason)
         {
             try
             {
                 var username = _userManager.GetUserName(User);
 
-                await _certificateRevocationService.Revoke(username, serialNumber);
+                await _certificateRevocationService.Revoke(username, serialNumber, revocationReason);
 
                 return Ok($"Certificate with serial number {serialNumber} and all linked with it are revoked.");
             }
